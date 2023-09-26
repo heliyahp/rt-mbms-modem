@@ -164,7 +164,7 @@ void print_version(FILE *stream, struct argp_state * /*state*/) {
 
 static Config cfg;  /**< Global configuration object. */
 
-static unsigned sample_rate = 7680000;  /**< Sample rate of the SDR */
+static unsigned sample_rate = 55555;  /**< Sample rate of the SDR */
 static unsigned search_sample_rate = 7680000;  /**< Sample rate of the SDR */
 static unsigned frequency = 667000000;  /**< Center freqeuncy the SDR is tuned to */
 static uint32_t bandwidth = 10000000;   /**< Low pass filter bandwidth for the SDR */
