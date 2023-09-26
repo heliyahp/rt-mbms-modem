@@ -134,9 +134,14 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
     case 'b':
       arguments->file_bw = static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break;
+    case  's':
+      start_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
+      break :
+    case  'e':
+      end_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
+      break : 
     case 'p':
-      arguments->override_nof_prb =
-          static_cast<int8_t>(strtol(arg, nullptr, 10));
+      frequency_step = static_cast<int8_t>(strtol(arg, nullptr, 10));
       break;
     case 'd':
       arguments->list_sdr_devices = true;
@@ -164,7 +169,7 @@ void print_version(FILE *stream, struct argp_state * /*state*/) {
 
 static Config cfg;  /**< Global configuration object. */
 
-static unsigned sample_rate = 55555;  /**< Sample rate of the SDR */
+static unsigned sample_rate = 7680000;  /**< Sample rate of the SDR */
 static unsigned search_sample_rate = 7680000;  /**< Sample rate of the SDR */
 static unsigned frequency = 667000000;  /**< Center freqeuncy the SDR is tuned to */
 static uint32_t bandwidth = 10000000;   /**< Low pass filter bandwidth for the SDR */
@@ -219,9 +224,16 @@ auto main(int argc, char **argv) -> int {
   /* Default values */
   arguments.config_file = "/etc/5gmag-rt.conf";
   arguments.sample_file = nullptr;
-  arguments.write_sample_file = nullptr;
-  argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
+  arguments.write_sample_file = nullptr
+  
 
+
+  argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
+  /* itrate over the frequency based on the command line argiment
+  */
+  for (unsigned frequency = start_frequency; freqeuncy <= end_frequency;free+= frequency_step)
+  {
+ 
   // Read and parse the configuration file
   try {
     cfg.readFile(arguments.config_file);
@@ -492,12 +504,12 @@ auto main(int argc, char **argv) -> int {
           // on a thread from the pool.
           if (!restart && phy.get_next_frame(cas_processor.rx_buffer(), cas_processor.rx_buffer_size())) {
             spdlog::debug("sending tti {} to regular processor", tti);
-            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler] {
+            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler] ){
                 if (ObjectPtr->process(tti)) {
                 // Set constellation diagram data and rx params for CAS in the REST API handler
                 rest_handler.add_cinr_value(ObjectPtr->cinr_db());
                 }
-                });
+                };
 
 
             if (phy.nof_mbsfn_prb() != mbsfn_nof_prb)
@@ -623,6 +635,7 @@ auto main(int argc, char **argv) -> int {
 
               int mtch_idx = 0;
               std::for_each(std::begin(mch.mtchs), std::end(mch.mtchs), [&mtch_idx](Phy::mtch_info_t const& mtch) {
+
                 spdlog::info("    MTCH {}: LCID {}, TMGI 0x{}, {}",
                   mtch_idx,
                   mtch.lcid,
@@ -640,7 +653,7 @@ auto main(int argc, char **argv) -> int {
       }
     }
   }
-
+  }
   // Main loop ended by signal. Free the MBSFN processors, and bail.
   for (int i = 0; i < thread_cnt; i++) {
     delete( mbsfn_processors[i] );
