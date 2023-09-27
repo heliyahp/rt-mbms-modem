@@ -29,6 +29,8 @@
  */
 
 #include <argp.h>
+#include <iostream>  // Added for cout
+#include <vector>    // Added for vector
 
 #include <cstdlib>
 #include <libconfig.h++>
@@ -50,9 +52,11 @@
 #include "srsran/rlc/rlc.h"
 #include "thread_pool.hpp"
 
+
 using libconfig::Config;
 using libconfig::FileIOException;
 using libconfig::ParseException;
+std:: vector<unsigned> Central_frequency; 
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -65,12 +69,12 @@ unsigned numCentral_frequency = 8;
 
 unsigned stepsize = (end_frequency - start_frequency ) / (numCentral_frequency -1);
 //calculate and store the central frequencies
-std:: vector<unsigned> Central_frequency; 
+ 
 
-for(unsigned i = 0; i < Central_frequency; ++i)
+for(unsigned i = 0; i < numCentral_frequency; ++i)
 {
-    unsigned Central_frequency = unsigned start_frequency + i * stepsize;
-    Central_frequency.push_back(Central_frequency;
+    unsigned Central_frequency = start_frequency + i * stepsize;
+    Central_frequencies.push_back(Central_frequency;
  }
 
 static void print_version(FILE *stream, struct argp_state *state);
@@ -153,7 +157,7 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
       break ;
     case  'e':
       end_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
-      break : 
+      break ;
     case 'p':
       frequency_step = static_cast<int8_t>(strtol(arg, nullptr, 10));
       break;
