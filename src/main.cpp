@@ -67,11 +67,11 @@ unsigned stepsize = (end_frequency - start_frequency ) / (numCentral_frequency -
 //calculate and store the central frequencies
 std:: vector<unsigned> Central_frequency; 
 
-for (unsigned i = 0; i < Central_frequency; ++i)
+for(unsigned i = 0; i < Central_frequency; ++i)
 {
     unsigned Central_frequency = unsigned start_frequency + i * stepsize;
-    Central_frequency.push_back(Central_frequency);
-    }
+    Central_frequency.push_back(Central_frequency;
+ }
 
 static void print_version(FILE *stream, struct argp_state *state);
 void (*argp_program_version_hook)(FILE *, struct argp_state *) = print_version;
@@ -137,9 +137,8 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
       arguments->log_level = static_cast<unsigned>(strtoul(arg, nullptr, 10));
       break;
     case 's':
-      arguments->srs_log_level =
-          static_cast<unsigned>(strtoul(arg, nullptr, 10));
-      break;
+      arguments->srs_log_level =static_cast<unsigned>(strtoul(arg, nullptr, 10));
+        break;
     case 'f':
       arguments->sample_file = arg;
       break;
@@ -149,9 +148,9 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
     case 'b':
       arguments->file_bw = static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break;
-    case  's':
+    case 's':
       start_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
-      break :
+      break ;
     case  'e':
       end_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break : 
@@ -239,16 +238,11 @@ auto main(int argc, char **argv) -> int {
   /* Default values */
   arguments.config_file = "/etc/5gmag-rt.conf";
   arguments.sample_file = nullptr;
-  arguments.write_sample_file = nullptr
+  arguments.write_sample_file = nullptr;
   
 
 
   argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
-  /* itrate over the frequency based on the command line argiment
-  */
-  for (unsigned frequency = start_frequency; freqeuncy <= end_frequency;free+= frequency_step)
-  {
- 
   // Read and parse the configuration file
   try {
     cfg.readFile(arguments.config_file);
@@ -294,7 +288,7 @@ auto main(int argc, char **argv) -> int {
 
   unsigned long long center_frequency = frequency;
   if (!cfg.lookupValue("modem.sdr.center_frequency_hz", center_frequency)) {
-    spdlog::error("Unable to parse center_frequency_hz - values must have a ‘L’ character appended");
+    spdlog::error("Unable to parse center_frequency_hz - values must have a L character appended");
     exit(1);
   }
   // We needed unsigned long long for correct parsing,
@@ -386,7 +380,7 @@ auto main(int argc, char **argv) -> int {
 
   state_t state = searching;
   for (unsigned central freq :center_frequency){
-    spdlog::info("Testin with central frequency :{} HZ"centralFreq);
+    spdlog::info("Testing with central frequency :{} HZ"centralFreq);
     //set the central frequencies
     set_params(antenna, centralFreq, gain, sample_rate, bandwidth )
   }
@@ -673,11 +667,11 @@ auto main(int argc, char **argv) -> int {
       }
     }
   }
-  }
+  
   // Main loop ended by signal. Free the MBSFN processors, and bail.
   for (int i = 0; i < thread_cnt; i++) {
     delete( mbsfn_processors[i] );
   }
-exit:
+ exit:
   return 0;
 }
