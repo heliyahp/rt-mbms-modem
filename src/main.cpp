@@ -57,6 +57,21 @@ using libconfig::ParseException;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
+unsigned start_frequency = 612000000;
+unsigned end_frequency = 652000000;
+unsigned numCentral_frequency = 8;
+
+//calculate the step size for divideing the frequency range 
+
+unsigned stepsize = (end_frequency - start_frequency ) / (numCentral_frequency -1);
+//calculate and store the central frequencies
+std:: vector<unsigned> Central_frequency; 
+
+for (unsigned i = 0; i < Central_frequency; ++i)
+{
+    unsigned Central_frequency = unsigned start_frequency + i * stepsize;
+    Central_frequency.push_back(Central_frequency);
+    }
 
 static void print_version(FILE *stream, struct argp_state *state);
 void (*argp_program_version_hook)(FILE *, struct argp_state *) = print_version;
@@ -370,6 +385,11 @@ auto main(int argc, char **argv) -> int {
 
 
   state_t state = searching;
+  for (unsigned central freq :center_frequency){
+    spdlog::info("Testin with central frequency :{} HZ"centralFreq);
+    //set the central frequencies
+    set_params(antenna, centralFreq, gain, sample_rate, bandwidth )
+  }
 
   // Create the RESTful API handler
   std::string uri = "http://0.0.0.0:3010/modem-api/";
