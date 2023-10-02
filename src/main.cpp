@@ -34,7 +34,9 @@
 
 #include <cstdlib>
 #include <libconfig.h++>
-
+#include <cstdio> //
+#include <cstring> //
+#include <pthread.h> //
 #include "CasFrameProcessor.h"
 #include "Gw.h"
 #include "SdrReader.h"
@@ -51,12 +53,15 @@
 #include "srsran/upper/pdcp.h"
 #include "srsran/rlc/rlc.h"
 #include "thread_pool.hpp"
+#include <vector>
+#include <libconfig.h++>
+#include <stdexcept>
 
 
 using libconfig::Config;
 using libconfig::FileIOException;
 using libconfig::ParseException;
-std:: vector<unsigned> Central_frequency; 
+
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -64,18 +69,18 @@ using std::placeholders::_3;
 unsigned start_frequency = 612000000;
 unsigned end_frequency = 652000000;
 unsigned numCentral_frequency = 8;
+std:: vector<unsigned> Central_frequency; 
 
 //calculate the step size for divideing the frequency range 
 
 unsigned stepsize = (end_frequency - start_frequency ) / (numCentral_frequency -1);
 //calculate and store the central frequencies
+
+ std::vector<unsigned> centralFrequencies ;
  
 
-for(unsigned i = 0; i < numCentral_frequency; ++i)
-{
-    unsigned Central_frequency = start_frequency + i * stepsize;
-    Central_frequencies.push_back(Central_frequency;
- }
+
+
 
 static void print_version(FILE *stream, struct argp_state *state);
 void (*argp_program_version_hook)(FILE *, struct argp_state *) = print_version;
@@ -152,15 +157,13 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
     case 'b':
       arguments->file_bw = static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break;
-    case 's':
+    case 'r':
       start_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break ;
     case  'e':
       end_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break ;
-    case 'p':
-      frequency_step = static_cast<int8_t>(strtol(arg, nullptr, 10));
-      break;
+    
     case 'd':
       arguments->list_sdr_devices = true;
       break;
@@ -247,17 +250,41 @@ auto main(int argc, char **argv) -> int {
 
 
   argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
-  // Read and parse the configuration file
+
+   for (unsigned i = 0; i < numCentral_frequency; ++i) {
+    unsigned CentralFrequencies = start_frequency + i * stepsize;
+    centralFrequencies.push_back(CentralFrequencies);
+ }
+  
   try {
-    cfg.readFile(arguments.config_file);
-  } catch(const FileIOException &fioex) {
-    spdlog::error("I/O error while reading config file at {}. Exiting.", arguments.config_file);
-    exit(1);
-  } catch(const ParseException &pex) {
-    spdlog::error("Config parse error at {}:{} - {}. Exiting.",
-        pex.getFile(), pex.getLine(), pex.getError());
-    exit(1);
-  }
+    cfg.readFile("arguments.config_file");
+    // Get a reference to the signal_frequencies setting.
+    libconfig::Setting& signals = cfg.lookup("modem.signal_frequencies");
+
+
+    // Check if the size of centralFrequencies matches the size of signals.
+    if (signals.getLength() != centralFrequencies.size()) {
+          std::cerr << "Error: The size of centralFrequencies does not match the size of signals in the configuration file." << std::endl;
+          return 1; // Exit with an error code.
+    }
+
+        // Update the central frequencies.
+    for (unsigned i = 0; i < centralFrequencies.size(); ++i) {
+      signals[i].add(centralFrequencies[i]);
+    }
+
+        // Write the updated configuration back to the file.
+    cfg.writeFile("arguments.config_file");
+  } catch (const libconfig::FileIOException& fioex) {
+    std::cerr << "I/O error while reading/writing the configuration file." << std::endl;
+    return 1; // Exit with an error code.
+ } catch (const libconfig::ParseException& pex) {
+       std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
+                  << " - " << pex.getError() << std::endl;
+       return 1; // Exit with an error code.
+    }
+  
+  
 
   // Set up logging
   std::string ident = "modem";
@@ -383,10 +410,10 @@ auto main(int argc, char **argv) -> int {
 
 
   state_t state = searching;
-  for (unsigned central freq :center_frequency){
-    spdlog::info("Testing with central frequency :{} HZ"centralFreq);
+  for(unsigned central_frequency :centralFrequencies ){
+    spdlog::info("Testing with central frequency :{} HZ", central_frequency);
     //set the central frequencies
-    set_params(antenna, centralFreq, gain, sample_rate, bandwidth )
+    void set_params(int antenna, unsigned Central_frequency, double gain, double sample_rate, double bandwidth);
   }
 
   // Create the RESTful API handler
@@ -522,12 +549,12 @@ auto main(int argc, char **argv) -> int {
           // on a thread from the pool.
           if (!restart && phy.get_next_frame(cas_processor.rx_buffer(), cas_processor.rx_buffer_size())) {
             spdlog::debug("sending tti {} to regular processor", tti);
-            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler] ){
+            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler](){
                 if (ObjectPtr->process(tti)) {
                 // Set constellation diagram data and rx params for CAS in the REST API handler
                 rest_handler.add_cinr_value(ObjectPtr->cinr_db());
                 }
-                };
+                });
 
 
             if (phy.nof_mbsfn_prb() != mbsfn_nof_prb)
