@@ -31,7 +31,11 @@
 #include <argp.h>
 #include <iostream>  // Added for cout
 #include <vector>    // Added for vector
-
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <thread>
+#include <mutex>
+#include <chrono>
 #include <cstdlib>
 #include <libconfig.h++>
 #include <cstdio> //
@@ -64,6 +68,42 @@ using libconfig::ParseException;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
+std::mutex configMutex;
+
+void updateConfigFile(const std::string& configFile, int newFrequency) {
+    std::unique_lock<std::mutex> lock(configMutex);
+
+    try {
+        // Load the existing configuration from the file
+        boost::property_tree::ptree config;
+        boost::property_tree::read_json(configFile, config);
+
+        // Update the frequency value in the configuration
+        config.put("frequency", newFrequency);
+
+        // Write the updated configuration back to the file
+        boost::property_tree::write_json(configFile, config);
+    } catch (const std::exception& e) {
+        std::cerr << "Error updating config file: " << e.what() << std::endl;
+    }
+}
+void synchronizationCheckThread(const std::string& configFile, int targetFrequency) {
+    while (true) {
+        // Simulate synchronization check
+        bool isSynchronizationLost = /* Perform synchronization check logic here */;
+
+        if (isSynchronizationLost) {
+            // Synchronization lost, update the configuration file
+            updateConfigFile(configFile, targetFrequency);
+            std::cout << "Synchronization lost. Updated frequency to " << targetFrequency << std::endl;
+        }
+
+        // Sleep for a while before checking again
+        std::this_thread::sleep_for(std::chrono::seconds(5)); // Adjust sleep duration as needed
+    }
+}
+       
+
 
 
 //calculate the step size for divideing the frequency range 
@@ -247,9 +287,9 @@ auto main(int argc, char **argv) -> int {
 
   argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
   unsigned start_frequency = 612000000;
-unsigned end_frequency = 652000000;
-unsigned numCentral_frequency = 8;
-unsigned stepsize = (end_frequency - start_frequency) / (numCentral_frequency - 1);
+  unsigned end_frequency = 652000000;
+  unsigned numCentral_frequency = 8;
+  unsigned stepsize = (end_frequency - start_frequency) / (numCentral_frequency - 1);
   unsigned CentralFrequencies = start_frequency + i * stepsize;
  
   std::vector<unsigned> centralFrequencies
@@ -450,6 +490,8 @@ unsigned stepsize = (end_frequency - start_frequency) / (numCentral_frequency - 
   cfg.lookupValue("modem.measurement_file.interval_secs", measurement_interval);
   measurement_interval *= 1000;
   uint32_t tick = 0;
+  std::thread syncThread(synchronizationCheckThread, configFile, targetFrequency);
+
 
   // Initial state: searching a cell
   state = searching;
