@@ -53,8 +53,6 @@
 #include "srsran/upper/pdcp.h"
 #include "srsran/rlc/rlc.h"
 #include "thread_pool.hpp"
-#include <vector>
-#include <libconfig.h++>
 #include <stdexcept>
 
 
@@ -66,10 +64,7 @@ using libconfig::ParseException;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
-unsigned start_frequency = 612000000;
-unsigned end_frequency = 652000000;
-unsigned numCentral_frequency = 8;
-std:: vector<unsigned> Central_frequency; 
+
 
 //calculate the step size for divideing the frequency range 
 
@@ -241,6 +236,7 @@ void set_params(const std::string& ant, unsigned fc, double g, unsigned sr, unsi
  * @return 0 on clean exit, -1 on failure
  */
 auto main(int argc, char **argv) -> int {
+
   struct arguments arguments;
   /* Default values */
   arguments.config_file = "/etc/5gmag-rt.conf";
@@ -250,9 +246,15 @@ auto main(int argc, char **argv) -> int {
 
 
   argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
-
-   for (unsigned i = 0; i < numCentral_frequency; ++i) {
-    unsigned CentralFrequencies = start_frequency + i * stepsize;
+  unsigned start_frequency = 612000000;
+unsigned end_frequency = 652000000;
+unsigned numCentral_frequency = 8;
+unsigned stepsize = (end_frequency - start_frequency) / (numCentral_frequency - 1);
+  unsigned CentralFrequencies = start_frequency + i * stepsize;
+ 
+  std::vector<unsigned> centralFrequencies
+  for (unsigned i = 0; i < numCentral_frequency; ++i) {
+    
     centralFrequencies.push_back(CentralFrequencies);
  }
   
