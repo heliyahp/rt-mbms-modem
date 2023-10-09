@@ -90,7 +90,7 @@ void updateConfigFile(const std::string& configFile, int newFrequency) {
 void synchronizationCheckThread(const std::string& configFile, int targetFrequency) {
     while (true) {
         // Simulate synchronization check
-        bool isSynchronizationLost = /* Perform synchronization check logic here */;
+        bool isSynchronizationLost = true;
 
         if (isSynchronizationLost) {
             // Synchronization lost, update the configuration file
@@ -104,17 +104,9 @@ void synchronizationCheckThread(const std::string& configFile, int targetFrequen
 }
        
 
-
-
-//calculate the step size for divideing the frequency range 
-
-unsigned stepsize = (end_frequency - start_frequency ) / (numCentral_frequency -1);
-//calculate and store the central frequencies
-
- std::vector<unsigned> centralFrequencies ;
- 
-
-
+unsigned start_frequency = 612000000;
+unsigned end_frequency = 652000000;
+unsigned numCentral_frequency = 8;
 
 
 static void print_version(FILE *stream, struct argp_state *state);
