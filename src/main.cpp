@@ -29,18 +29,11 @@
  */
 
 #include <argp.h>
-#include <iostream>  // Added for cout
-#include <vector>    // Added for vector
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <thread>
-#include <mutex>
-#include <chrono>
+
 #include <cstdlib>
 #include <libconfig.h++>
-#include <cstdio> //
-#include <cstring> //
-#include <pthread.h> //
+#include <vector>
+
 #include "CasFrameProcessor.h"
 #include "Gw.h"
 #include "SdrReader.h"
@@ -57,57 +50,15 @@
 #include "srsran/upper/pdcp.h"
 #include "srsran/rlc/rlc.h"
 #include "thread_pool.hpp"
-#include <stdexcept>
 
 
 using libconfig::Config;
 using libconfig::FileIOException;
 using libconfig::ParseException;
 
-
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
-std::mutex configMutex;
-
-void updateConfigFile(const std::string& configFile, int newFrequency) {
-    std::unique_lock<std::mutex> lock(configMutex);
-
-    try {
-        // Load the existing configuration from the file
-        boost::property_tree::ptree config;
-        boost::property_tree::read_json(configFile, config);
-
-        // Update the frequency value in the configuration
-        config.put("frequency", newFrequency);
-
-        // Write the updated configuration back to the file
-        boost::property_tree::write_json(configFile, config);
-    } catch (const std::exception& e) {
-        std::cerr << "Error updating config file: " << e.what() << std::endl;
-    }
-}
-void synchronizationCheckThread(const std::string& configFile, int targetFrequency) {
-    while (true) {
-        // Simulate synchronization check
-        bool isSynchronizationLost = true;
-
-        if (isSynchronizationLost) {
-            // Synchronization lost, update the configuration file
-            updateConfigFile(configFile, targetFrequency);
-            std::cout << "Synchronization lost. Updated frequency to " << targetFrequency << std::endl;
-        }
-
-        // Sleep for a while before checking again
-        std::this_thread::sleep_for(std::chrono::seconds(5)); // Adjust sleep duration as needed
-    }
-}
-       
-
-unsigned start_frequency = 612000000;
-unsigned end_frequency = 652000000;
-unsigned numCentral_frequency = 8;
-
 
 static void print_version(FILE *stream, struct argp_state *state);
 void (*argp_program_version_hook)(FILE *, struct argp_state *) = print_version;
@@ -173,8 +124,9 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
       arguments->log_level = static_cast<unsigned>(strtoul(arg, nullptr, 10));
       break;
     case 's':
-      arguments->srs_log_level =static_cast<unsigned>(strtoul(arg, nullptr, 10));
-        break;
+      arguments->srs_log_level =
+          static_cast<unsigned>(strtoul(arg, nullptr, 10));
+      break;
     case 'f':
       arguments->sample_file = arg;
       break;
@@ -184,13 +136,10 @@ static auto parse_opt(int key, char *arg, struct argp_state *state) -> error_t {
     case 'b':
       arguments->file_bw = static_cast<uint8_t>(strtoul(arg, nullptr, 10));
       break;
-    case 'r':
-      start_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
-      break ;
-    case  'e':
-      end_frequency  =  static_cast<uint8_t>(strtoul(arg, nullptr, 10));
-      break ;
-    
+    case 'p':
+      arguments->override_nof_prb =
+          static_cast<int8_t>(strtol(arg, nullptr, 10));
+      break;
     case 'd':
       arguments->list_sdr_devices = true;
       break;
@@ -260,6 +209,37 @@ void set_params(const std::string& ant, unsigned fc, double g, unsigned sr, unsi
   restart = true;
 }
 
+void parseFrequenciesFromConfig(const std::string& configFile, std::vector<unsigned long long>& frequencies) {
+    libconfig::Config cfg;
+
+    try {
+        cfg.readFile(configFile.c_str());
+    } catch (const libconfig::FileIOException& e) {
+        std::cerr << "Error reading configuration file: " << e.what() << std::endl;
+        exit(1);
+    } catch (const libconfig::ParseException& e) {
+        std::cerr << "Parse error in configuration file at line " << e.getLine() << ": " << e.getError() << std::endl;
+        exit(1);
+    }
+
+    const libconfig::Setting& root = cfg.getRoot();
+
+    // Use the lookup method to access the setting you need
+    const libconfig::Setting& sdrSettings = root["modem"]["sdr"];
+    const libconfig::Setting& centerFrequenciesSetting = sdrSettings.lookup("center_frequencies_hz");
+
+    for (int i = 0; i < centerFrequenciesSetting.getLength(); ++i) {
+        unsigned long long frequency;
+        if (centerFrequenciesSetting[i].lookupValue("value", frequency)) {
+            frequencies.push_back(frequency);
+        } else {
+            std::cerr << "Unable to parse center frequency at index " << i << " - values must have an 'L' character appended" << std::endl;
+            exit(1);
+        }
+    }
+}
+
+  
 /**
  *  Main entry point for the program.
  *  
@@ -268,57 +248,25 @@ void set_params(const std::string& ant, unsigned fc, double g, unsigned sr, unsi
  * @return 0 on clean exit, -1 on failure
  */
 auto main(int argc, char **argv) -> int {
-
   struct arguments arguments;
   /* Default values */
   arguments.config_file = "/etc/5gmag-rt.conf";
   arguments.sample_file = nullptr;
   arguments.write_sample_file = nullptr;
-  
-
-
   argp_parse(&argp, argc, argv, 0, nullptr, &arguments);
-  unsigned start_frequency = 612000000;
-  unsigned end_frequency = 652000000;
-  unsigned numCentral_frequency = 8;
-  unsigned stepsize = (end_frequency - start_frequency) / (numCentral_frequency - 1);
-  unsigned CentralFrequencies = start_frequency + i * stepsize;
- 
-  std::vector<unsigned> centralFrequencies
-  for (unsigned i = 0; i < numCentral_frequency; ++i) {
-    
-    centralFrequencies.push_back(CentralFrequencies);
- }
-  
+
+
+  // Read and parse the configuration file
   try {
-    cfg.readFile("arguments.config_file");
-    // Get a reference to the signal_frequencies setting.
-    libconfig::Setting& signals = cfg.lookup("modem.signal_frequencies");
-
-
-    // Check if the size of centralFrequencies matches the size of signals.
-    if (signals.getLength() != centralFrequencies.size()) {
-          std::cerr << "Error: The size of centralFrequencies does not match the size of signals in the configuration file." << std::endl;
-          return 1; // Exit with an error code.
-    }
-
-        // Update the central frequencies.
-    for (unsigned i = 0; i < centralFrequencies.size(); ++i) {
-      signals[i].add(centralFrequencies[i]);
-    }
-
-        // Write the updated configuration back to the file.
-    cfg.writeFile("arguments.config_file");
-  } catch (const libconfig::FileIOException& fioex) {
-    std::cerr << "I/O error while reading/writing the configuration file." << std::endl;
-    return 1; // Exit with an error code.
- } catch (const libconfig::ParseException& pex) {
-       std::cerr << "Parse error at " << pex.getFile() << ":" << pex.getLine()
-                  << " - " << pex.getError() << std::endl;
-       return 1; // Exit with an error code.
-    }
-  
-  
+    cfg.readFile(arguments.config_file);
+  } catch(const FileIOException &fioex) {
+    spdlog::error("I/O error while reading config file at {}. Exiting.", arguments.config_file);
+    exit(1);
+  } catch(const ParseException &pex) {
+    spdlog::error("Config parse error at {}:{} - {}. Exiting.",
+        pex.getFile(), pex.getLine(), pex.getError());
+    exit(1);
+  }
 
   // Set up logging
   std::string ident = "modem";
@@ -351,30 +299,76 @@ auto main(int argc, char **argv) -> int {
   cfg.lookupValue("modem.sdr.search_sample_rate_hz", sample_rate);
   search_sample_rate = sample_rate;
 
-  unsigned long long center_frequency = frequency;
+ /* unsigned long long center_frequency = frequency;
   if (!cfg.lookupValue("modem.sdr.center_frequency_hz", center_frequency)) {
-    spdlog::error("Unable to parse center_frequency_hz - values must have a L character appended");
+    spdlog::error("Unable to parse center_frequency_hz - values must have a ‘L’ character appended");
     exit(1);
-  }
+  }*/
+  
+
+  std::vector<unsigned long long> frequencies;
+  
+  std::string configFile = "/etc/5gmag-rt.conf";
+  parseFrequenciesFromConfig(configFile, frequencies);
+   
   // We needed unsigned long long for correct parsing,
   // but unsigned is required
-  if (center_frequency <= UINT_MAX) {
+  /*if (frequencies[1] <= UINT_MAX) {
      frequency = static_cast<unsigned>(center_frequency);
   } else {
     spdlog::error("Configured center_frequency_hz is {}, maximal value supported is {}.",
         center_frequency, UINT_MAX);
     exit(1);
-  }
+  }*/
+
 
 
   cfg.lookupValue("modem.sdr.normalized_gain", gain);
   cfg.lookupValue("modem.sdr.antenna", antenna);
   cfg.lookupValue("modem.sdr.use_agc", use_agc);
 
-  if (!sdr.tune(frequency, sample_rate, bandwidth, gain, antenna, use_agc)) {
+  /*if (!sdr.tune(frequencies[0], sample_rate, bandwidth, gain, antenna, use_agc)) {
     spdlog::error("Failed to set initial center frequency. Exiting.");
     exit(1);
   }
+   if (sdr.tune(frequencies[0], sample_rate, bandwidth, gain, antenna, use_agc)) {
+        spdlog::info("Tuned to the first frequency: {}", frequencies[0]);
+    } else {
+        spdlog::error("Failed to set center frequency: {}", frequencies[0]);
+        
+        // Attempt to tune to the second frequency only if the first one fails
+        if (sdr.tune(frequencies[1], sample_rate, bandwidth, gain, antenna, use_agc)) {
+            spdlog::info("Tuned to the second frequency: {}", frequencies[1]);
+        } else {
+            spdlog::error("Failed to set center frequency: {}", frequencies[1]);
+            exit(1);
+        }
+    }   
+    */ if (frequencies[0] <= UINT_MAX) {
+        unsigned frequency1 = frequencies[0];
+        if (sdr.tune(frequency1, sample_rate, bandwidth, gain, antenna, use_agc)) {
+            spdlog::info("Tuned to the first frequency: {}", frequency1);
+        } else {
+            spdlog::error("Failed to set center frequency: {}", frequency1);
+        }
+    } else {
+        spdlog::error("Configured center_frequency_hz is {}, maximal value supported is {}.", frequencies[0], UINT_MAX);
+        exit(1);
+    }
+
+    // Attempt to tune to the second frequency
+    if (frequencies[1] <= UINT_MAX) {
+        unsigned frequency2 = frequencies[1];
+        if (sdr.tune(frequency2, sample_rate, bandwidth, gain, antenna, use_agc)) {
+            spdlog::info("Tuned to the second frequency: {}", frequency2);
+        } else {
+            spdlog::error("Failed to set center frequency: {}", frequency2);
+        }
+    } else {
+        spdlog::error("Configured center_frequency_hz is {}, maximal value supported is {}.", frequencies[1], UINT_MAX);
+        exit(1);
+    }
+
 
   set_srsran_verbose_level(arguments.log_level <= 1 ? SRSRAN_VERBOSE_DEBUG : SRSRAN_VERBOSE_NONE);
   srsran_use_standard_symbol_size(true);
@@ -444,11 +438,6 @@ auto main(int argc, char **argv) -> int {
 
 
   state_t state = searching;
-  for(unsigned central_frequency :centralFrequencies ){
-    spdlog::info("Testing with central frequency :{} HZ", central_frequency);
-    //set the central frequencies
-    void set_params(int antenna, unsigned Central_frequency, double gain, double sample_rate, double bandwidth);
-  }
 
   // Create the RESTful API handler
   std::string uri = "http://0.0.0.0:3010/modem-api/";
@@ -482,8 +471,6 @@ auto main(int argc, char **argv) -> int {
   cfg.lookupValue("modem.measurement_file.interval_secs", measurement_interval);
   measurement_interval *= 1000;
   uint32_t tick = 0;
-  std::thread syncThread(synchronizationCheckThread, configFile, targetFrequency);
-
 
   // Initial state: searching a cell
   state = searching;
@@ -585,7 +572,7 @@ auto main(int argc, char **argv) -> int {
           // on a thread from the pool.
           if (!restart && phy.get_next_frame(cas_processor.rx_buffer(), cas_processor.rx_buffer_size())) {
             spdlog::debug("sending tti {} to regular processor", tti);
-            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler](){
+            pool.push([ObjectPtr = &cas_processor, tti, &rest_handler] {
                 if (ObjectPtr->process(tti)) {
                 // Set constellation diagram data and rx params for CAS in the REST API handler
                 rest_handler.add_cinr_value(ObjectPtr->cinr_db());
@@ -716,7 +703,6 @@ auto main(int argc, char **argv) -> int {
 
               int mtch_idx = 0;
               std::for_each(std::begin(mch.mtchs), std::end(mch.mtchs), [&mtch_idx](Phy::mtch_info_t const& mtch) {
-
                 spdlog::info("    MTCH {}: LCID {}, TMGI 0x{}, {}",
                   mtch_idx,
                   mtch.lcid,
@@ -734,11 +720,11 @@ auto main(int argc, char **argv) -> int {
       }
     }
   }
-  
+
   // Main loop ended by signal. Free the MBSFN processors, and bail.
   for (int i = 0; i < thread_cnt; i++) {
     delete( mbsfn_processors[i] );
   }
- exit:
+exit:
   return 0;
 }
